@@ -96,11 +96,7 @@ gameOver model =
 
 
 initialCamera =
-    let
-        w =
-            12.8
-    in
-    Camera.fixedWidth w ( 3, w / 4 )
+    Camera.fixedWidth 12.8 ( 3, 3.2 )
 
 
 getTextures =
@@ -184,9 +180,7 @@ updateHelper msg model =
                 model
 
         Resources rMsg ->
-            { model
-                | resources = Resources.update rMsg model.resources
-            }
+            { model | resources = Resources.update rMsg model.resources }
 
 
 jump : Robin -> Robin
