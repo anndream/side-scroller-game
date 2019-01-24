@@ -60,12 +60,12 @@ initialRobin =
 
 robinsWidth : Float
 robinsWidth =
-    23 / 64
+    2 * (23 / 64)
 
 
 robinsHeight : Float
 robinsHeight =
-    36 / 64
+    2 * (36 / 64)
 
 
 init : () -> ( Model, Cmd Msg )
@@ -96,14 +96,17 @@ gameOver model =
 
 
 initialCamera =
-    Camera.fixedWidth 8 ( 2.3, 1.5 )
+    let
+        w =
+            12.8
+    in
+    Camera.fixedWidth w ( 3, w / 4 )
 
 
 getTextures =
     Cmd.map Resources
         (Resources.loadTextures
             [ "images/robin-running.png"
-            , "images/grass.png"
             , "images/plx-1.png"
             , "images/plx-2.png"
             , "images/plx-3.png"
@@ -313,7 +316,7 @@ renderRobin resources { x, y } =
         , texture = Resources.getTexture "images/robin-running.png" resources
         , bottomLeft = ( 0, -36 / 64 )
         , topRight = ( 23 / 64, 0 )
-        , duration = 0.8
+        , duration = 0.6
         , numberOfFrames = 8
         , rotation = 0
         , pivot = ( 0, 0 )
@@ -329,12 +332,12 @@ renderBackground resources =
                 , texture = Resources.getTexture path resources
                 , scrollSpeed = ( ss, ss )
                 , tileWH = ( 1, 2 )
-                , offset = ( 0, 0.45 )
+                , offset = ( 0, 0 )
                 }
     in
     [ layer -0.99 "images/plx-1.png" 0
     , layer -0.98 "images/plx-2.png" 0.2
     , layer -0.97 "images/plx-3.png" 0.5
     , layer -0.96 "images/plx-4.png" 0.8
-    , layer -0.95 "images/plx-5.png" 1.4
+    , layer -0.95 "images/plx-5.png" 1.35
     ]
