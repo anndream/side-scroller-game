@@ -1,28 +1,22 @@
 module Main exposing (main)
 
 import Browser exposing (Document)
-import Browser.Dom exposing (getViewport)
-import Browser.Events exposing (onAnimationFrameDelta, onResize)
+import Browser.Events
 import Color exposing (Color)
 import Game.Resources as Resources exposing (Resources)
-import Game.TwoD as Game
+import Game.TwoD
 import Game.TwoD.Camera as Camera exposing (Camera)
 import Game.TwoD.Render as Render exposing (Renderable)
-import Html exposing (Html, div)
-import Html.Attributes as HA
 import Json.Decode as JD exposing (Decoder, Value)
-import Keyboard
-import Keyboard.Arrows
-import Task
 
 
-{-| This is a simple side scrolling game made with Zinggi/elm-2d-game
+{-| A simple side scrolling game made with Zinggi/elm-2d-game
 -}
 main : Program () Model Msg
 main =
     Browser.document
-        { update = update
-        , init = init
+        { init = init
+        , update = update
         , view = view
         , subscriptions = subs
         }
@@ -35,76 +29,27 @@ main =
 type alias Model =
     { time : Float
     , robin : Robin
-    , running : Bool
     , camera : Camera
     , resources : Resources
     }
 
 
 type alias Robin =
-    { y : Float
-    , vy : Float
-    , x : Float
+    { x : Float
     , vx : Float
+    , y : Float
+    , vy : Float
     }
-
-
-initialRobin : Robin
-initialRobin =
-    { y = 0
-    , vy = 0
-    , x = 0
-    , vx = 4
-    }
-
-
-robinsWidth : Float
-robinsWidth =
-    2 * (23 / 64)
-
-
-robinsHeight : Float
-robinsHeight =
-    2 * (36 / 64)
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { time = 0
-      , robin = initialRobin
-      , running = False
+      , robin = { x = 0, vx = 0, y = 0, vy = 0 }
       , camera = initialCamera
       , resources = Resources.init
       }
-    , getTextures
-    )
-
-
-initialize : Model -> Model
-initialize model =
-    { model
-        | time = 0
-        , running = True
-        , robin = initialRobin
-        , camera = initialCamera
-    }
-
-
-gameOver : Model -> Model
-gameOver model =
-    { model | running = False }
-
-
-initialCamera =
-    let
-        w =
-            12.8
-    in
-    Camera.fixedWidth w ( 3, w / 4 )
-
-
-getTextures =
-    Cmd.map Resources
+    , Cmd.map GotResources
         (Resources.loadTextures
             [ "images/robin-running.png"
             , "images/plx-1.png"
@@ -114,6 +59,17 @@ getTextures =
             , "images/plx-5.png"
             ]
         )
+    )
+
+
+initialCamera : Camera
+initialCamera =
+    Camera.fixedWidth 14 ( 3, 3.5 )
+
+
+robinsSize : ( Float, Float )
+robinsSize =
+    ( 23 / 30, 36 / 30 )
 
 
 type alias Obstacle =
@@ -147,7 +103,7 @@ obstacles =
 type Msg
     = MouseDown MousePosition
     | Tick Float
-    | Resources Resources.Msg
+    | GotResources Resources.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -159,43 +115,63 @@ updateHelper : Msg -> Model -> Model
 updateHelper msg model =
     case msg of
         MouseDown _ ->
-            if model.running then
-                { model
-                    | robin = jump model.robin
-                }
+            if isRunning model.robin then
+                { model | robin = jumpIfBelowZero model.robin }
 
             else
-                initialize model
+                { model
+                    | time = 0
+                    , robin = { x = 0, vx = 4, y = 0, vy = 0 }
+                    , camera = initialCamera
+                }
 
         Tick dt ->
-            if model.running then
-                if thereIsCollision model.robin then
-                    gameOver model
+            if isRunning model.robin then
+                if collidesWithAnObstacle model.robin then
+                    { model | robin = freeze model.robin }
 
                 else
                     { model
                         | time = model.time + dt
                         , robin = tick dt model.robin
                         , camera =
-                            Camera.moveBy ( dt * model.robin.vx, 0 ) model.camera
+                            model.camera
+                                |> Camera.moveBy ( dt * model.robin.vx, 0 )
                     }
 
             else
                 model
 
-        Resources rMsg ->
-            { model
-                | resources = Resources.update rMsg model.resources
-            }
+        GotResources rMsg ->
+            { model | resources = model.resources |> Resources.update rMsg }
 
 
-jump : Robin -> Robin
-jump guy =
-    if guy.y == 0 then
-        { guy | vy = 7.0 }
+isRunning : Robin -> Bool
+isRunning r =
+    r.vx > 0
+
+
+run : Robin -> Robin
+run r =
+    { r | vx = 4 }
+
+
+jumpIfBelowZero : Robin -> Robin
+jumpIfBelowZero r =
+    if r.y > 0 then
+        r
 
     else
-        guy
+        { r | vy = 7.0 }
+
+
+freeze : Robin -> Robin
+freeze r =
+    { r | vx = 0, vy = 0 }
+
+
+
+--
 
 
 tick : Float -> Robin -> Robin
@@ -225,9 +201,16 @@ physics dt guy =
     }
 
 
-thereIsCollision : Robin -> Bool
-thereIsCollision robin =
+
+--
+
+
+collidesWithAnObstacle : Robin -> Bool
+collidesWithAnObstacle robin =
     let
+        ( robinsWidth, robinsHeight ) =
+            robinsSize
+
         allTrue =
             List.all identity
 
@@ -269,7 +252,7 @@ mousePosition =
 subs : Model -> Sub Msg
 subs model =
     Sub.batch
-        [ onAnimationFrameDelta ((\dt -> dt / 1000) >> Tick)
+        [ Browser.Events.onAnimationFrameDelta ((\dt -> dt / 1000) >> Tick)
         , Browser.Events.onMouseDown (JD.map MouseDown mousePosition)
         ]
 
@@ -282,10 +265,10 @@ view : Model -> Document Msg
 view model =
     { title = "Side Scrolling Game"
     , body =
-        [ Game.renderCentered
+        [ Game.TwoD.renderCentered
             { camera = model.camera
             , time = model.time
-            , size = ( 1024, 512 )
+            , size = ( 1200, 600 )
             }
             (render model)
         ]
@@ -312,11 +295,11 @@ renderRobin : Resources -> Robin -> Renderable
 renderRobin resources { x, y } =
     Render.animatedSpriteWithOptions
         { position = ( x, y, 0 )
-        , size = ( robinsWidth, robinsHeight )
+        , size = robinsSize
         , texture = Resources.getTexture "images/robin-running.png" resources
         , bottomLeft = ( 0, -36 / 64 )
         , topRight = ( 23 / 64, 0 )
-        , duration = 0.6
+        , duration = 0.5
         , numberOfFrames = 8
         , rotation = 0
         , pivot = ( 0, 0 )
@@ -331,13 +314,13 @@ renderBackground resources =
                 { z = z
                 , texture = Resources.getTexture path resources
                 , scrollSpeed = ( ss, ss )
-                , tileWH = ( 1, 2 )
-                , offset = ( 0, 0 )
+                , tileWH = ( 1.17, 2.34 )
+                , offset = ( 0, 0.8 )
                 }
     in
     [ layer -0.99 "images/plx-1.png" 0
     , layer -0.98 "images/plx-2.png" 0.2
     , layer -0.97 "images/plx-3.png" 0.5
-    , layer -0.96 "images/plx-4.png" 0.8
-    , layer -0.95 "images/plx-5.png" 1.35
+    , layer -0.96 "images/plx-4.png" 0.7
+    , layer -0.95 "images/plx-5.png" 0.9
     ]
