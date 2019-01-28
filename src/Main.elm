@@ -23,43 +23,7 @@ main =
 
 
 
--- MODEL
-
-
-type alias Model =
-    { time : Float
-    , robin : Robin
-    , camera : Camera
-    , resources : Resources
-    }
-
-
-type alias Robin =
-    { x : Float
-    , vx : Float
-    , y : Float
-    , vy : Float
-    }
-
-
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( { time = 0
-      , robin = { x = 0, vx = 0, y = 0, vy = 0 }
-      , camera = initialCamera
-      , resources = Resources.init
-      }
-    , Cmd.map GotResources
-        (Resources.loadTextures
-            [ "images/robin-running.png"
-            , "images/plx-1.png"
-            , "images/plx-2.png"
-            , "images/plx-3.png"
-            , "images/plx-4.png"
-            , "images/plx-5.png"
-            ]
-        )
-    )
+-- CONSTANTS
 
 
 initialCamera : Camera
@@ -67,9 +31,21 @@ initialCamera =
     Camera.fixedWidth 14 ( 3, 3.5 )
 
 
+robinAtStart : Robin
+robinAtStart =
+    { x = 0, vx = 0, y = 0, vy = 0 }
+
+
+speed : Float
+speed =
+    4
+
+
 robinsSize : ( Float, Float )
 robinsSize =
-    ( 23 / 30, 36 / 30 )
+    ( 0.03 * 23
+    , 0.03 * 36
+    )
 
 
 type alias Obstacle =
@@ -97,6 +73,46 @@ obstacles =
 
 
 
+-- MODEL
+
+
+type alias Model =
+    { time : Float
+    , robin : Robin
+    , camera : Camera
+    , resources : Resources
+    }
+
+
+type alias Robin =
+    { x : Float
+    , vx : Float
+    , y : Float
+    , vy : Float
+    }
+
+
+init : () -> ( Model, Cmd Msg )
+init _ =
+    ( { time = 0
+      , robin = robinAtStart
+      , camera = initialCamera
+      , resources = Resources.init
+      }
+    , Cmd.map GotResources
+        (Resources.loadTextures
+            [ "images/robin-running.png"
+            , "images/plx-1.png"
+            , "images/plx-2.png"
+            , "images/plx-3.png"
+            , "images/plx-4.png"
+            , "images/plx-5.png"
+            ]
+        )
+    )
+
+
+
 -- UPDATE
 
 
@@ -116,12 +132,12 @@ updateHelper msg model =
     case msg of
         MouseDown _ ->
             if isRunning model.robin then
-                { model | robin = jumpIfBelowZero model.robin }
+                { model | robin = jumpIfOnGround model.robin }
 
             else
                 { model
                     | time = 0
-                    , robin = { x = 0, vx = 4, y = 0, vy = 0 }
+                    , robin = run robinAtStart
                     , camera = initialCamera
                 }
 
@@ -153,11 +169,11 @@ isRunning r =
 
 run : Robin -> Robin
 run r =
-    { r | vx = 4 }
+    { r | vx = speed }
 
 
-jumpIfBelowZero : Robin -> Robin
-jumpIfBelowZero r =
+jumpIfOnGround : Robin -> Robin
+jumpIfOnGround r =
     if r.y > 0 then
         r
 
